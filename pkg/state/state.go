@@ -1975,12 +1975,32 @@ func (st *HelmState) appendConnectionFlags(flags []string, release *ReleaseSpec)
 	return flags
 }
 
+func (st *HelmState) hasAuthPlugin() bool {
+	currentEnv := st.Environments[st.Env.Name]
+	if currentEnv.Kubeconfig != nil {
+		return true
+	}
+	return false
+}
+
 func (st *HelmState) connectionFlags(release *ReleaseSpec) []string {
 	flags := []string{}
 	tillerless := st.HelmDefaults.Tillerless
 	if release.Tillerless != nil {
 		tillerless = *release.Tillerless
 	}
+
+	if st.hasAuthPlugin() {
+		currentEnv := st.Environments[st.Env.Name]
+		kubeconfig, err := currentEnv.getKubeconfigProvider().GetKubeconfig()
+		if err != nil {
+			fmt.Println(err)
+		} else {
+			flags = append(flags, "--kubeconfig", kubeconfig)
+			// need to signal cleanup after exec call
+		}
+	}
+
 	if !tillerless {
 		if release.TillerNamespace != "" {
 			flags = append(flags, "--tiller-namespace", release.TillerNamespace)
